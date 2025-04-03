@@ -1,0 +1,115 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: project-draft-db
+  labels:
+    app: project-draft-db
+spec:
+  selector:
+    matchLabels:
+      app: project-draft-db
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: project-draft-db
+    spec:
+      containers:
+        - image: docker.io/library/postgres:latest
+          name: project-draft-db
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              value: password
+            - name: POSTGRES_USER
+              value: postgres
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: project-draft-db
+spec:
+  selector:
+    app: project-draft-db
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: project-draft
+  labels:
+    app: project-draft
+spec:
+  selector:
+    matchLabels:
+      app: project-draft
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: project-draft
+    spec:
+      containers:
+        - image: project-draft:release
+          imagePullPolicy: Never
+          name: project-draft
+          command: ["./script/run"]
+          ports:
+            - containerPort: 3000
+          env:
+            - name: APP_DATABASE__HOST
+              value: project-draft-db
+            - name: APP_DATABASE__PORT
+              value: "5432"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: project-draft
+spec:
+  type: LoadBalancer
+  selector:
+    app: project-draft
+  ports:
+    - port: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: project-draft-redis
+spec:
+  selector:
+    app: project-draft-redis
+  ports:
+    - port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: project-draft
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web, websecure
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - project-draft.smallercircles.dev
+      secretName: project-draft-tls
+  rules:
+    - host: project-draft.smallercircles.dev
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: project-draft
+                port:
+                  number: 3000

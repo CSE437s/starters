@@ -93,18 +93,9 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: project-draft
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefik.ingress.kubernetes.io/router.entrypoints: web, websecure
 spec:
-  ingressClassName: traefik
-  tls:
-    - hosts:
-        - project-draft.smallercircles.dev
-      secretName: project-draft-tls
   rules:
-    - host: project-draft.smallercircles.dev
-      http:
+    - http:
         paths:
           - pathType: Prefix
             path: /
